@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Random Terrain Generator</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #controls {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+        #controls label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        #controls label span {
+            flex: 1;
+        }
+        #controls input {
+            flex: 2;
+            margin-left: 10px;
+        }
+        #regenerate {
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label><span>Scale:</span> <input type="range" id="scale" min="1" max="100" value="20"></label>
+        <label><span>Height:</span> <input type="range" id="height" min="1" max="50" value="10"></label>
+        <label><span>Seed:</span> <input type="number" id="seed" step="0.01" value="0.5"></label>
+        <button id="regenerate">Regenerate</button>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/simplex-noise/dist/simplex-noise.min.js"></script>
+    <script>
+        let scene, camera, renderer, mesh;
+        let parameters = {
+            width: 200,
+            height: 200,
+            widthSegments: 100,
+            heightSegments: 100,
+            scale: 20,
+            heightMultiplier: 10,
+            seed: 0.5
+        };
+
+        init();
+        generateTerrain();
+
+        function init() {
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 1000);
+            camera.position.set(0, 100, 200);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            let light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(0, 100, 100);
+            scene.add(light);
+
+            window.addEventListener('resize', onWindowResize, false);
+
+            document.getElementById('scale').addEventListener('input', function() {
+                parameters.scale = this.value;
+                generateTerrain();
+            });
+
+            document.getElementById('height').addEventListener('input', function() {
+                parameters.heightMultiplier = this.value;
+                generateTerrain();
+            });
+
+            document.getElementById('seed').addEventListener('input', function() {
+                parameters.seed = parseFloat(this.value);
+                generateTerrain();
+            });
+
+            document.getElementById('regenerate').addEventListener('click', function() {
+                parameters.seed = Math.random();
+                document.getElementById('seed').value = parameters.seed.toFixed(2);
+                generateTerrain();
+            });
+        }
+
+        function generateTerrain() {
+            if (mesh) {
+                scene.remove(mesh);
+                mesh.geometry.dispose();
+                mesh.material.dispose();
+                mesh = null;
+            }
+
+            let geometry = new THREE.PlaneGeometry(
+                parameters.width,
+                parameters.height,
+                parameters.widthSegments,
+                parameters.heightSegments
+            );
+            geometry.rotateX(-Math.PI / 2);
+
+            let simplex = new SimplexNoise(parameters.seed);
+
+            let positions = geometry.attributes.position.array;
+
+            for (let i = 0; i <= positions.length; i += 3) {
+                let x = positions[i];
+                let z = positions[i + 2];
+                let y = simplex.noise2D(x / parameters.scale, z / parameters.scale) * parameters.heightMultiplier;
+                positions[i + 1] = y;
+            }
+
+            geometry.computeVertexNormals();
+
+            let material = new THREE.MeshStandardMaterial({ color: 0x5566aa, wireframe: false });
+
+            mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
